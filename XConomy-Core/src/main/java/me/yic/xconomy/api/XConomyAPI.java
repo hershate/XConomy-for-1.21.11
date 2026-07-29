@@ -85,10 +85,17 @@ public class XConomyAPI {
     }
 
     public int changePlayerBalance(UUID u, String playername, BigDecimal amount, Boolean isadd, String pluginname) {
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) < 0) {
+            return 4;
+        }
         if (XConomyLoad.getSyncData_Enable() & AdapterManager.BanModiftyBalance()) {
             return 1;
         }
-        BigDecimal bal = getPlayerData(u).getBalance();
+        PlayerData pd = getPlayerData(u);
+        if (pd == null) {
+            return 5;
+        }
+        BigDecimal bal = pd.getBalance();
         if (isadd != null) {
             if (isadd) {
                 if (ismaxnumber(bal.add(amount))) {
@@ -119,7 +126,13 @@ public class XConomyAPI {
     }
 
     public int changeNonPlayerBalance(String account, BigDecimal amount, Boolean isadd, String pluginname) {
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) < 0) {
+            return 4;
+        }
         BigDecimal bal = getNonPlayerBalance(account);
+        if (bal == null) {
+            bal = BigDecimal.ZERO;
+        }
         if (isadd != null) {
             if (isadd) {
                 if (ismaxnumber(bal.add(amount))) {

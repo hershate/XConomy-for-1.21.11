@@ -42,6 +42,10 @@ public class EnterpriseWallet extends PlayerWallet {
                     "[BungeeCord] No player in server");
         }
 
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) < 0) {
+            return new EconomyAction(getHolder(), false, "Amount cannot be negative");
+        }
+
         if (DataFormat.isMAX(amount)) {
             return new EconomyAction(getHolder(), false,  "Max balance!");
         }
@@ -82,10 +86,10 @@ public class EnterpriseWallet extends PlayerWallet {
     @Override
     public boolean has(BigDecimal bigDecimal) {
         BigDecimal bal = getBalance();
-        if (bal == null){
+        if (bal == null || bigDecimal == null){
             return false;
         }
-        return getBalance().compareTo(getBalance()) > 0;
+        return bal.compareTo(bigDecimal) >= 0;
     }
 
     @Override
@@ -100,7 +104,14 @@ public class EnterpriseWallet extends PlayerWallet {
             return new EconomyAction(getHolder(), false, "[BungeeCord] No player in server");
         }
 
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) < 0) {
+            return new EconomyAction(getHolder(), false, "Amount cannot be negative");
+        }
+
         BigDecimal bal = getBalance();
+        if (bal == null) {
+            return new EconomyAction(getHolder(), false, "No Account!");
+        }
 
         if (bal.compareTo(amount) < 0) {
             return new EconomyAction(getHolder(), false, "Insufficient balance!");
@@ -124,7 +135,14 @@ public class EnterpriseWallet extends PlayerWallet {
                     "[BungeeCord] No player in server");
         }
 
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) < 0) {
+            return new EconomyAction(getHolder(), false, "Amount cannot be negative");
+        }
+
         BigDecimal bal = getBalance();
+        if (bal == null) {
+            return new EconomyAction(getHolder(), false, "No Account!");
+        }
 
         if (DataFormat.isMAX(bal.add(amount))) {
             return new EconomyAction(getHolder(), false,  "Max balance!");

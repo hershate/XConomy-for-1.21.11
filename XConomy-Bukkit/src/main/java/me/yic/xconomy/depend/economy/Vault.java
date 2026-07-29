@@ -121,6 +121,10 @@ public class Vault extends AbstractEconomy {
                     "[BungeeCord] No player in server");
         }
 
+        if (isInvalidAmount(amount)) {
+            return new EconomyResponse(0.0D, 0.0D, EconomyResponse.ResponseType.FAILURE, "Amount cannot be negative");
+        }
+
         double bal = getBalance(name);
         BigDecimal amountFormatted = DataFormat.formatdouble(amount);
 
@@ -147,6 +151,10 @@ public class Vault extends AbstractEconomy {
         if (AdapterManager.BanModiftyBalance()) {
             return new EconomyResponse(0.0D, 0.0D, EconomyResponse.ResponseType.FAILURE,
                     "[BungeeCord] No player in server");
+        }
+
+        if (isInvalidAmount(amount)) {
+            return new EconomyResponse(0.0D, 0.0D, EconomyResponse.ResponseType.FAILURE, "Amount cannot be negative");
         }
 
         if (DataCon.getPlayerData(pp.getUniqueId()) == null) {
@@ -309,6 +317,10 @@ public class Vault extends AbstractEconomy {
                     "[BungeeCord] No player in server");
         }
 
+        if (isInvalidAmount(amount)) {
+            return new EconomyResponse(0.0D, 0.0D, EconomyResponse.ResponseType.FAILURE, "Amount cannot be negative");
+        }
+
         double bal = getBalance(name);
         BigDecimal amountFormatted = DataFormat.formatdouble(amount);
 
@@ -335,6 +347,10 @@ public class Vault extends AbstractEconomy {
         if (AdapterManager.BanModiftyBalance()) {
             return new EconomyResponse(0.0D, 0.0D, EconomyResponse.ResponseType.FAILURE,
                     "[BungeeCord] No player in server");
+        }
+
+        if (isInvalidAmount(amount)) {
+            return new EconomyResponse(0.0D, 0.0D, EconomyResponse.ResponseType.FAILURE, "Amount cannot be negative");
         }
 
         if (DataCon.getPlayerData(pp.getUniqueId()) == null) {
@@ -393,6 +409,16 @@ public class Vault extends AbstractEconomy {
         } else {
             return DataCon.containinfieldslist(name);
         }
+    }
+
+    /**
+     * 校验金额是否合法：必须为有限非负数。
+     * 拒绝负数（否则 withdrawPlayer(player, -x) 会使余额凭空增加，即刷币；
+     * depositPlayer 负数则语义错乱），拒绝 NaN/Infinity（会导致
+     * BigDecimal.valueOf 抛出 NumberFormatException 而崩溃）。
+     */
+    private static boolean isInvalidAmount(double amount) {
+        return amount < 0 || Double.isNaN(amount) || Double.isInfinite(amount);
     }
 
 }
