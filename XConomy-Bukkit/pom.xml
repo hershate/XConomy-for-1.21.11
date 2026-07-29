@@ -159,11 +159,11 @@
             <version>1.7</version>
             <scope>provided</scope>
         </dependency>
-        <!--Placeholder API-->
+        <!--PlaceholderAPI 桩（自实现，替代失效的 me.clip:placeholderapi:2.11.1）-->
         <dependency>
-            <groupId>me.clip</groupId>
-            <artifactId>placeholderapi</artifactId>
-            <version>2.11.1</version>
+            <groupId>me.yic</groupId>
+            <artifactId>XConomy-Stub</artifactId>
+            <version>${revision}</version>
             <scope>provided</scope>
         </dependency>
         <!--BStats-Bukkit-->

@@ -29,20 +29,11 @@
             <version>${kotlin.version}</version>
             <scope>test</scope>
         </dependency>
-        <!--Bungeecord 1.15-->
+        <!--BungeeCord API 桩（自实现，替代失效的 net.md-5:bungeecord-api:1.15-SNAPSHOT）-->
         <dependency>
-            <groupId>net.md-5</groupId>
-            <artifactId>bungeecord-api</artifactId>
-            <version>1.15-SNAPSHOT</version>
-            <type>jar</type>
-            <scope>provided</scope>
-        </dependency>
-        <!--Bungeecord 1.15 Javadocs-->
-        <dependency>
-            <groupId>net.md-5</groupId>
-            <artifactId>bungeecord-api</artifactId>
-            <version>1.15-SNAPSHOT</version>
-            <type>javadoc</type>
+            <groupId>me.yic</groupId>
+            <artifactId>XConomy-Stub</artifactId>
+            <version>${revision}</version>
             <scope>provided</scope>
         </dependency>
         <!--velocity 3.0-->
