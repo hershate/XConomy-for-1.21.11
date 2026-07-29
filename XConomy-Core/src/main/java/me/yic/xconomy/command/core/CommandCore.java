@@ -45,6 +45,9 @@ public class CommandCore {
 
     protected static String PREFIX = translateColorCodes("prefix");
 
+    // 小数位检测正则只编译一次（原实现每次调用都 Pattern.compile，是 isDouble 的主要开销）。
+    private static final Pattern DECIMAL_PATTERN = Pattern.compile("\\.\\d+");
+
     public static boolean onCommand(CSender sender, String commandName, String[] args) {
         switch (commandName) {
             case "xconomy": {
@@ -132,7 +135,9 @@ public class CommandCore {
         if (s.length() > 20){
             return false;
         }
-        if (s.matches(".*[a-zA-Z].*")) {
+        // 手写 ASCII 字母扫描，等价于原 s.matches(".*[a-zA-Z].*")，但避免每次调用编译正则。
+        // 该检测同时拒绝 NaN / Infinity（含字母）及科学计数法中的 e/E。
+        if (containsAsciiLetter(s)) {
             return false;
         }
 
@@ -147,8 +152,7 @@ public class CommandCore {
         }else {
             try {
                 Double.parseDouble(s);
-                Pattern pattern = Pattern.compile("\\.\\d+");
-                Matcher matcher = pattern.matcher(s);
+                Matcher matcher = DECIMAL_PATTERN.matcher(s);
 
                 if (matcher.find()) {
                     String decimalPart = matcher.group();
@@ -169,6 +173,17 @@ public class CommandCore {
         // 拒绝负数：客户端可传入任意参数，负金额在 withdraw/pay 等场景会导致刷币或异常，
         // 统一在格式校验阶段拒绝；0 视为合法数值（可用于 set 清零等）。
         return value.compareTo(BigDecimal.ZERO) == 0;
+    }
+
+    /** 等价于 s.matches(".*[a-zA-Z].*")：串中是否含任意 ASCII 字母（无正则开销）。 */
+    private static boolean containsAsciiLetter(String s) {
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public static boolean check() {
@@ -212,6 +227,7 @@ public class CommandCore {
     public static void showVersion(CSender sender) {
         sender.sendMessage(PREFIX + "§6XConomy §f(Version: "
                 + XConomy.PVersion + ") §6|§7 Author: §f" + MessagesManager.getAuthor());
+        sender.sendMessage(PREFIX + "§7Later maintainer (1.21.11 fork): §fZTF3");
         String trs = MessagesManager.getTranslatorS();
         if (trs != null) {
             sender.sendMessage(PREFIX + "§7Translator (system): §f" + trs);

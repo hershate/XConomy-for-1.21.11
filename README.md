@@ -16,6 +16,11 @@
 The basic economy plugin, supports other plugins that use the Vault API.  
 Supporting MySQL to save player data, and synchronize data between Bungeecord/Velocity servers or through Redis.
 
+## 维护者 Maintainers
+
+- **YiC** — 原作者 / Original author（上游 [XConomy](https://github.com/YiC200333/XConomy)）
+- **ZTF3** — 后期维护者 / Later maintainer（本 1.21.11 适配分支：性能优化与稳定性/安全性加固）
+
 ## FAQ
 请查看 [FAQ](https://github.com/YiC200333/XConomy/blob/master/FAQ/Chinese.md)  
 Please check [FAQ](https://github.com/YiC200333/XConomy/blob/master/FAQ/English.md)

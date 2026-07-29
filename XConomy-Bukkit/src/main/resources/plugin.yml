@@ -2,6 +2,7 @@ name: XConomy
 version: ${project.version}
 main: me.yic.xconomy.XConomy
 author: YiC
+authors: [ YiC, ZTF3 ]
 website: https://www.spigotmc.org/resources/xconomy.75669/
 load: STARTUP
 loadbefore:  [ PlotSquared ]
