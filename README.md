@@ -27,15 +27,4 @@ Please check [FAQ](https://github.com/YiC200333/XConomy/blob/master/FAQ/English.
 Please check [XConomyAPI](https://github.com/YiC200333/XConomyAPI)
 
 ## 下载 Download
-仅在这些网站上发布过  
-Only published on these websites
-
-~~MCBBS: https://www.mcbbs.net/thread-962904-1-1.html~~
-
-MineBBS: https://www.minebbs.com/resources/xconomy-bc-spigot-sponge.7410/
-
-Spigot: https://www.spigotmc.org/resources/xconomy.75669/
-
-Sponge: https://ore.spongepowered.org/YiC/XConomy
-
-Github: https://github.com/YiC200333/XConomy/releases
+Github: https://github.com/hershate/XConomy-for-1.21.11/releases
