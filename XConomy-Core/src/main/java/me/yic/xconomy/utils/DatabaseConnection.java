@@ -45,7 +45,8 @@ public class DatabaseConnection {
     //============================================================================================
     private Connection connection = null;
     private HikariDataSource hikari = null;
-    private boolean isfirstry = true;
+    // 重连专用锁：串行化故障时的 close()/重建，避免高并发下多线程同时重建连接池造成连接风暴。
+    private final Object reconnectLock = new Object();
 
     private void createNewHikariConfiguration() {
         hikari = new HikariDataSource();
@@ -158,23 +159,44 @@ public class DatabaseConnection {
     }
 
     public Connection getConnectionAndCheck() {
+        Connection conn = attemptConnection();
+        if (conn != null) {
+            return conn;
+        }
+        // 获取失败：在锁内重连，避免高并发下多个线程同时 close()/setGlobalConnection()
+        // 反复关闭并重建连接池，造成连接风暴（雪崩）。
+        synchronized (reconnectLock) {
+            // 双重检查：等待锁期间可能已被其他线程重连恢复，先再试一次
+            conn = attemptConnection();
+            if (conn != null) {
+                return conn;
+            }
+            // 仍未恢复，执行一次重连
+            try {
+                close();
+            } catch (Exception ignored) {
+            }
+            if (!setGlobalConnection()) {
+                XConomy.getInstance().logger("无法连接到数据库-----", 1, null);
+                return null;
+            }
+            conn = attemptConnection();
+            if (conn == null) {
+                XConomy.getInstance().logger("无法连接到数据库-----", 1, null);
+            }
+            return conn;
+        }
+    }
+
+    private Connection attemptConnection() {
         if (!canConnect()) {
             return null;
         }
         try {
             return getConnection();
-        } catch (SQLException e1) {
-            if (isfirstry) {
-                isfirstry = false;
-                close();
-                return getConnectionAndCheck();
-            } else {
-                isfirstry = true;
-                XConomy.getInstance().logger("无法连接到数据库-----", 1, null);
-                close();
-                e1.printStackTrace();
-                return null;
-            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return null;
         }
     }
 

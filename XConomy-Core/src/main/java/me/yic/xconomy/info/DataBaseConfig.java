@@ -30,12 +30,13 @@ public class DataBaseConfig {
     public static CConfig config;
 
     public void Initialization() {
-        if (!XConomyLoad.Config.DISABLE_CACHE) {
-            if (getStorageType() != 1) {
-                canasync = true;
-            }
-        }
         setHikariConnectionPooling();
+        // 仅在启用连接池、开启缓存、且非 SQLite 时才允许异步落库。
+        // 未启用连接池时数据库为单一共享 Connection，多线程异步并发使用同一 Connection
+        // 会导致语句交错与数据损坏，因此必须强制同步执行。
+        if (EnableConnectionPool && !XConomyLoad.Config.DISABLE_CACHE) {
+            canasync = true;
+        }
     }
 
     public boolean EnableConnectionPool = false;
