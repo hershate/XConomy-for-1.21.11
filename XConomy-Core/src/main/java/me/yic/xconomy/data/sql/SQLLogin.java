@@ -39,6 +39,9 @@ public class SQLLogin extends SQL {
 
     public static void updatelogininfo(UUID uuid) {
         Connection connection = database.getConnectionAndCheck();
+        if (connection == null) {
+            return;
+        }
         Date dd = new Date();
         String sd = (new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")).format(dd);
         try {
@@ -65,6 +68,9 @@ public class SQLLogin extends SQL {
     public static void getPlayerlogin(CPlayer pp) {
         try {
             Connection connection = database.getConnectionAndCheck();
+            if (connection == null) {
+                return;
+            }
             PreparedStatement statement = connection.prepareStatement("select player, amount from " + tableRecordName +
                     " where operation = 'WITHDRAW' and type = 'PLAYER_COMMAND' and command like('pay " + pp.getName() + "%') and datetime > " +
                     "(select last_time from " + tableLoginName + " where UUID = ?);");

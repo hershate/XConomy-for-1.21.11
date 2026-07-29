@@ -46,6 +46,10 @@ public class SQLCreateNewAccount extends SQL {
             return false;
         }
         Connection connection = database.getConnectionAndCheck();
+        if (connection == null) {
+            XConomy.getInstance().logger("建号失败：无法获取数据库连接", 1, null);
+            return false;
+        }
         switch (XConomyLoad.Config.UUIDMODE) {
             case ONLINE:
             case OFFLINE:
@@ -188,6 +192,10 @@ public class SQLCreateNewAccount extends SQL {
 
     public static boolean createNonPlayerAccount(String account) {
         Connection co = database.getConnectionAndCheck();
+        if (co == null) {
+            XConomy.getInstance().logger("创建非玩家账户失败：无法获取数据库连接", 1, null);
+            return false;
+        }
         try {
             String query = "INSERT OR IGNORE INTO " + tableNonPlayerName + "(account, balance) values(?,?)";
             if (XConomyLoad.DConfig.isMySQL()) {

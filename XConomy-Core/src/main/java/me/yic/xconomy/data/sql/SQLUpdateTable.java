@@ -27,6 +27,9 @@ public class SQLUpdateTable extends SQL {
 
     public static void updataTable() {
         Connection connection = database.getConnectionAndCheck();
+        if (connection == null) {
+            return;
+        }
         try {
 
             PreparedStatement statementa = connection.prepareStatement("select * from " + tableName + " where hidden = '1'");
@@ -55,6 +58,9 @@ public class SQLUpdateTable extends SQL {
     public static void updataTable_record() {
         if (XConomyLoad.DConfig.isMySQL() && XConomyLoad.Config.TRANSACTION_RECORD) {
             Connection connection = database.getConnectionAndCheck();
+            if (connection == null) {
+                return;
+            }
             try {
                 PreparedStatement statementa = connection.prepareStatement("desc " + tableRecordName + " date");
                 ResultSet rs = statementa.executeQuery();

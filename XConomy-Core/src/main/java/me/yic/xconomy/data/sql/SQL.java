@@ -59,6 +59,10 @@ public class SQL {
         if (XConomyLoad.DConfig.isMySQL()) {
             try {
                 Connection connection = database.getConnectionAndCheck();
+                if (connection == null) {
+                    database.setHikariValidationTimeout();
+                    return;
+                }
 
                 String query = "show variables like 'wait_timeout'";
 
@@ -91,6 +95,9 @@ public class SQL {
     public static void createTable() {
         try {
             Connection connection = database.getConnectionAndCheck();
+            if (connection == null) {
+                return;
+            }
             Statement statement = connection.createStatement();
 
             if (statement == null) {
@@ -155,6 +162,9 @@ public class SQL {
         PlayerData bd = null;
         try {
             Connection connection = database.getConnectionAndCheck();
+            if (connection == null) {
+                return bd;
+            }
             String sql = "select * from " + tableName + " where UID = ?";
             if (XConomyLoad.Config.UUIDMODE.equals(UUIDMode.SEMIONLINE)) {
                 sql = "select * from " + tableName + " where UID = ifnull((select DUUID from " + tableUUIDName + " where UUID = ?), ?)";
@@ -192,6 +202,9 @@ public class SQL {
         PlayerData bd = null;
         try {
             Connection connection = database.getConnectionAndCheck();
+            if (connection == null) {
+                return bd;
+            }
             String query;
 
             if (XConomyLoad.Config.USERNAME_IGNORE_CASE) {
@@ -244,6 +257,9 @@ public class SQL {
         BigDecimal bal = null;
         try {
             Connection connection = database.getConnectionAndCheck();
+            if (connection == null) {
+                return bal;
+            }
             String query;
 
             if (XConomyLoad.DConfig.isMySQL()) {
@@ -445,6 +461,10 @@ public class SQL {
 
     public static void deletePlayerData(String UUID) {
         Connection connection = database.getConnectionAndCheck();
+        if (connection == null) {
+            XConomy.getInstance().logger("删除玩家数据失败：无法获取数据库连接", 1, null);
+            return;
+        }
         try {
             String query = "delete from " + tableName + " where UID = ?";
             PreparedStatement statement = connection.prepareStatement(query);
@@ -468,6 +488,9 @@ public class SQL {
     public static void getBaltop() {
         try {
             Connection connection = database.getConnectionAndCheck();
+            if (connection == null) {
+                return;
+            }
             PreparedStatement statement = connection.prepareStatement(
                     "select * from " + tableName + " where hidden != '1' order by balance desc limit " + XConomyLoad.Config.RANKING_SIZE);
 
@@ -490,6 +513,9 @@ public class SQL {
 
         try {
             Connection connection = database.getConnectionAndCheck();
+            if (connection == null) {
+                return bal;
+            }
             PreparedStatement statement = connection.prepareStatement("select SUM(balance) from " + tableName + " where hidden != '1'");
 
             ResultSet rs = statement.executeQuery();
@@ -509,6 +535,10 @@ public class SQL {
 
     public static void hidetop(UUID u, int type) {
         Connection connection = database.getConnectionAndCheck();
+        if (connection == null) {
+            XConomy.getInstance().logger("设置隐藏状态失败：无法获取数据库连接", 1, null);
+            return;
+        }
         try {
             String query = " set hidden = ? where UID = ?";
             PreparedStatement statement = connection.prepareStatement("update " + tableName + query);
