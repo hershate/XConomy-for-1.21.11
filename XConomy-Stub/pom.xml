@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <parent>
+        <artifactId>XConomy</artifactId>
+        <groupId>me.yic</groupId>
+        <version>${revision}</version>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+
+    <artifactId>XConomy-Stub</artifactId>
+
+    <!--
+        本模块为编译期桩（stub）：自实现 XConomy-Core 编译所需的 BungeeCord / Velocity API 子集，
+        替代已无法从仓库解析的外部依赖（net.md-5:bungeecord-api:1.15-SNAPSHOT 等）。
+
+        作为 provided 依赖提供给 XConomy-Core，因此桩类不会被打包进 Bukkit / Paper jar。
+        运行时：
+          - net.md_5.bungee.api.ChatColor 由 Paper / Spigot 服务端内嵌提供（与原 bungeecord-api=provided 行为一致）；
+          - XConomyBungee / XConomyVelocity / BCsync / Vsync 等代理端类为不加载的死类，其依赖类无需运行时存在。
+    -->
+
+    <repositories>
+        <repository>
+            <id>spigot-repo</id>
+            <url>https://hub.spigotmc.org/nexus/content/repositories/snapshots/</url>
+        </repository>
+    </repositories>
+
+    <dependencies>
+        <!--Spigot API（为 PlaceholderExpansion 桩提供 org.bukkit.OfflinePlayer 等 Bukkit 类型）-->
+        <dependency>
+            <groupId>org.spigotmc</groupId>
+            <artifactId>spigot-api</artifactId>
+            <version>1.17.1-R0.1-SNAPSHOT</version>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <sourceDirectory>src/main/java</sourceDirectory>
+    </build>
+
+</project>
