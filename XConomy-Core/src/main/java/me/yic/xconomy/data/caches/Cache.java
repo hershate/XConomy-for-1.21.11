@@ -29,6 +29,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 public class Cache {
     public static final ConcurrentHashMap<UUID, PlayerData> pds = new ConcurrentHashMap<>();
@@ -37,9 +38,11 @@ public class Cache {
 
     private static final ConcurrentHashMap<UUID, UUID> m_uuids = new ConcurrentHashMap<>();
 
-    public static LinkedHashMap<String, BigDecimal> baltop = new LinkedHashMap<>();
-    public static List<String> baltop_papi = new ArrayList<>();
-    public static BigDecimal sumbalance = BigDecimal.ZERO;
+    // 排行榜数据在异步 Baltop 任务中写入、在主线程与 PlaceholderAPI 中读取，
+    // 使用并发安全容器避免 ConcurrentModificationException；sumbalance 用 volatile 保证可见性。
+    public static ConcurrentHashMap<String, BigDecimal> baltop = new ConcurrentHashMap<>();
+    public static CopyOnWriteArrayList<String> baltop_papi = new CopyOnWriteArrayList<>();
+    public static volatile BigDecimal sumbalance = BigDecimal.ZERO;
 
     public static void insertIntoCache(final UUID uuid, final PlayerData pd) {
         if (pd != null) {
