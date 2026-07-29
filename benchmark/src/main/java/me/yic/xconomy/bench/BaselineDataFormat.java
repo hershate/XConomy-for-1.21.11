@@ -2,6 +2,7 @@ package me.yic.xconomy.bench;
 
 import me.yic.xconomy.XConomyLoad;
 import me.yic.xconomy.adapter.comp.CChat;
+import net.md_5.bungee.api.ChatColor;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -43,6 +44,14 @@ public final class BaselineDataFormat {
         }
     }
 
+    public static BigDecimal formatBigDecimal(BigDecimal am) {
+        if (isint) {
+            return am.setScale(0, roundingmode);
+        } else {
+            return am.setScale(2, roundingmode);
+        }
+    }
+
     public static boolean isMAX(BigDecimal am) {
         return am.compareTo(maxNumber) > 0;
     }
@@ -58,6 +67,20 @@ public final class BaselineDataFormat {
         }
         return CChat.translateAlternateColorCodes('&', displayformat
                 .replace("%balance%", decimalFormat.format(am))
+                .replace("%format_balance%", getformatbalance(am))
+                .replace("%currencyname%", pluralname));
+    }
+
+    // PEshownf 逐行拷贝自优化前 DataFormat（用于 PlaceholderAPI balance_formatted 对照）
+    public static String PEshownf(BigDecimal am) {
+        if (am.compareTo(BigDecimal.ONE) == 0) {
+            return ChatColor.translateAlternateColorCodes('&', displayformat
+                    .replace("%balance%", getformatbalance(am))
+                    .replace("%format_balance%", getformatbalance(am))
+                    .replace("%currencyname%", singularname));
+        }
+        return ChatColor.translateAlternateColorCodes('&', displayformat
+                .replace("%balance%", getformatbalance(am))
                 .replace("%format_balance%", getformatbalance(am))
                 .replace("%currencyname%", pluralname));
     }
