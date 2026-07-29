@@ -107,7 +107,11 @@ public class Cache {
                 u = uuids.get(((String) key));
             }
         }
-        return pds.get(u);
+        // 边界修复：按玩家名(或 SEMIONLINE 之外的 String 键)未命中时 u 为 null，
+        // 而 pds 是 ConcurrentHashMap（不允许 null 键），pds.get(null) 会抛 NPE。
+        // 此处返回 null 表示“不在缓存”，使读路径可安全地“单次 get + 回源”，
+        // 也修复了原先“仅在 containsKey 守卫下才不触发”的潜伏 NPE。
+        return u == null ? null : pds.get(u);
     }
 
     public static void deleteDataFromCache(final UUID key) {
