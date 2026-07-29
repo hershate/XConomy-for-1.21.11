@@ -64,13 +64,12 @@ public class DataCon {
     }
 
     public static BigDecimal getAccountBalance(String account) {
-        BigDecimal bal = null;
         if (XConomyLoad.Config.DISABLE_CACHE){
             return DataLink.getBalNonPlayer(account);
         }
-        if (CacheNonPlayer.CacheContainsKey(account)) {
-            bal = CacheNonPlayer.getBalanceFromCacheOrDB(account);
-        }
+        // 单次缓存查询；未命中（含并发移除）返回 null，再回源数据库。
+        // 等价于原先“CacheContainsKey 命中后再 getBalanceFromCacheOrDB”的两步查询，省一次哈希查找。
+        BigDecimal bal = CacheNonPlayer.getBalanceFromCacheOrDB(account);
         if (bal == null){
             bal =  DataLink.getBalNonPlayer(account);
         }
@@ -78,15 +77,12 @@ public class DataCon {
     }
 
     private static <T> PlayerData getPlayerDatai(T u) {
-        PlayerData pd = null;
-
         if (XConomyLoad.Config.DISABLE_CACHE) {
             return DataLink.getPlayerData(u);
         }
-
-        if (Cache.CacheContainsKey(u)) {
-            pd = Cache.getDataFromCache(u);
-        }
+        // 单次缓存查询；未命中（含并发移除）返回 null，再回源数据库。
+        // 等价于原先“CacheContainsKey 命中后再 getDataFromCache”的两步查询，省一次哈希查找。
+        PlayerData pd = Cache.getDataFromCache(u);
         if (pd == null){
             pd = DataLink.getPlayerData(u);
         }

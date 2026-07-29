@@ -27,6 +27,9 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 public class DataFormat {
 
@@ -38,6 +41,26 @@ public class DataFormat {
     final static String displayformat = XConomyLoad.Config.DISPLAY_FORMAT;
     final static String pluralname = XConomyLoad.Config.PLURAL_NAME;
     final static String singularname = XConomyLoad.Config.SINGULAR_NAME;
+
+    // ---- 余额展示结果缓存（性能优化，行为等价）----
+    // shown/PEshownf 的输出仅取决于“余额值”与“load() 之后固定的格式化配置”
+    // （displayformat / singular|pluralname / decimalFormat / format-balance / roundingmode）。
+    // 在高重复访问场景（PlaceholderAPI、记分板、Tab 列表对同一玩家余额反复刷新）下，
+    // 用按余额值的有界 LRU 缓存，把一次完整的格式化（BigDecimal 比较 + 多次 String.replace
+    // + DecimalFormat + 颜色翻译）折叠为一次哈希查询。配置重载（load()）时清空。
+    // BigDecimal 不可变且 equals/hashCode 按值，作为缓存键安全。
+    private static final int SHOWN_CACHE_CAPACITY = 4096;
+    private static final Map<BigDecimal, String> shownCache = boundedLruCache();
+    private static final Map<BigDecimal, String> peShownCache = boundedLruCache();
+
+    private static Map<BigDecimal, String> boundedLruCache() {
+        return Collections.synchronizedMap(new LinkedHashMap<BigDecimal, String>(256, 0.75f, true) {
+            @Override
+            protected boolean removeEldestEntry(Map.Entry<BigDecimal, String> eldest) {
+                return size() > SHOWN_CACHE_CAPACITY;
+            }
+        });
+    }
 
 
 
@@ -68,6 +91,17 @@ public class DataFormat {
     }
 
     public static String shown(BigDecimal am) {
+        // 缓存命中：直接返回；未命中：计算后写入（多线程并发未命中会重复计算，结果幂等，安全）。
+        String cached = shownCache.get(am);
+        if (cached != null) {
+            return cached;
+        }
+        String result = computeShown(am);
+        shownCache.put(am, result);
+        return result;
+    }
+
+    private static String computeShown(BigDecimal am) {
         if (am.compareTo(BigDecimal.ONE) == 0) {
             return CChat.translateAlternateColorCodes('&', displayformat
                     .replace("%balance%", decimalFormat.format(am))
@@ -86,6 +120,16 @@ public class DataFormat {
     }
 
     public static String PEshownf(BigDecimal am) {
+        String cached = peShownCache.get(am);
+        if (cached != null) {
+            return cached;
+        }
+        String result = computePEshownf(am);
+        peShownCache.put(am, result);
+        return result;
+    }
+
+    private static String computePEshownf(BigDecimal am) {
         if (am.compareTo(BigDecimal.ONE) == 0) {
             return ChatColor.translateAlternateColorCodes('&', displayformat
                     .replace("%balance%", getformatbalance(am))
@@ -103,6 +147,9 @@ public class DataFormat {
     }
 
     public static void load() {
+        // 配置重载：展示结果可能改变，清空展示缓存。
+        shownCache.clear();
+        peShownCache.clear();
         maxNumber = setmaxnumber();
         isint = XConomyLoad.Config.INTEGER_BAL;
         String gpoint = XConomyLoad.Config.THOUSANDS_SEPARATOR;
