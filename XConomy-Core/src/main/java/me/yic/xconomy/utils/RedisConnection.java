@@ -112,6 +112,7 @@ public class RedisConnection {
             try {
                 ObjectOutputStream oos = new ObjectOutputStream(output);
                 oos.writeUTF(XConomy.syncversion);
+                oos.writeUTF(XConomyLoad.Config.SYNCDATA_SIGN == null ? "" : XConomyLoad.Config.SYNCDATA_SIGN);
                 oos.writeObject(ls);
                 oos.flush();
             } catch (IOException e) {
@@ -133,6 +134,12 @@ public class RedisConnection {
             String sv = ios.readUTF();
             if (!sv.equals(XConomy.syncversion)) {
                 XConomy.getInstance().logger("收到不同版本插件的数据，无法同步，当前插件版本 ", 1, XConomy.syncversion);
+                return null;
+            }
+            // 签名校验在反序列化之前完成，防止 Redis 中被注入的恶意数据触发 Java 原生反序列化
+            String sg = ios.readUTF();
+            String configSign = XConomyLoad.Config.SYNCDATA_SIGN;
+            if (configSign == null || configSign.isEmpty() || !configSign.equals(sg)) {
                 return null;
             }
 
