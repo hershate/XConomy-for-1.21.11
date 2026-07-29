@@ -166,8 +166,9 @@ public class CommandCore {
         if (value.compareTo(BigDecimal.ZERO) > 0) {
             return !DataFormat.isMAX(DataFormat.formatString(s));
         }
-
-        return true;
+        // 拒绝负数：客户端可传入任意参数，负金额在 withdraw/pay 等场景会导致刷币或异常，
+        // 统一在格式校验阶段拒绝；0 视为合法数值（可用于 set 清零等）。
+        return value.compareTo(BigDecimal.ZERO) == 0;
     }
 
     public static boolean check() {
