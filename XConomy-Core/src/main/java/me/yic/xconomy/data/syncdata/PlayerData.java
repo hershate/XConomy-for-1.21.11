@@ -61,12 +61,16 @@ public class PlayerData extends SyncData {
 
     @Override
     public void SyncStart() {
-        if (!XConomyLoad.Config.DISABLE_CACHE) {
-            if (Cache.CacheContainsKey(getUniqueId()) && Cache.getDataFromCache(getUniqueId()).balance.compareTo(vbalance) != 0) {
-                DataCon.deletedatafromcache(getUniqueId());
-                return;
+        // 与本地 changeplayerdata 使用同一把 per-UUID 锁，避免异步同步线程(此处执行)
+        // 与主线程并发写同一玩家缓存而造成丢失更新。
+        synchronized (DataCon.getPlayerLock(getUniqueId())) {
+            if (!XConomyLoad.Config.DISABLE_CACHE) {
+                if (Cache.CacheContainsKey(getUniqueId()) && Cache.getDataFromCache(getUniqueId()).balance.compareTo(vbalance) != 0) {
+                    DataCon.deletedatafromcache(getUniqueId());
+                    return;
+                }
             }
+            Cache.insertIntoCache(getUniqueId(), this);
         }
-        Cache.insertIntoCache(getUniqueId(), this);
     }
 }

@@ -38,21 +38,21 @@ import me.yic.xconomy.utils.SendPluginMessage;
 import java.math.BigDecimal;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.locks.ReentrantLock;
 
 public class DataCon {
 
     // 按账户维度的锁，串行化同一玩家/非玩家账户的"读取-计算-写缓存"流程，
     // 消除高并发下的缓存丢失更新（lost update）。
-    private static final ConcurrentHashMap<UUID, ReentrantLock> playerLocks = new ConcurrentHashMap<>();
-    private static final ConcurrentHashMap<String, ReentrantLock> accountLocks = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<UUID, Object> playerLocks = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<String, Object> accountLocks = new ConcurrentHashMap<>();
 
-    private static ReentrantLock getPlayerLock(UUID u) {
-        return playerLocks.computeIfAbsent(u, k -> new ReentrantLock());
+    // public 供跨服同步的 SyncStart 与本地变更串行化，避免异步同步线程与主线程并发写同一玩家缓存
+    public static Object getPlayerLock(UUID u) {
+        return playerLocks.computeIfAbsent(u, k -> new Object());
     }
 
-    private static ReentrantLock getAccountLock(String a) {
-        return accountLocks.computeIfAbsent(a, k -> new ReentrantLock());
+    private static Object getAccountLock(String a) {
+        return accountLocks.computeIfAbsent(a, k -> new Object());
     }
 
     public static PlayerData getPlayerData(UUID uuid) {

@@ -19,12 +19,16 @@
 package me.yic.xconomy.info;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 public class PermissionINFO {
-    public static boolean globalpayment = true;
+    // 跨线程(异步同步线程写、主线程读)读写，使用 volatile 保证可见性
+    public static volatile boolean globalpayment = true;
 
-    private static final Map<UUID, Boolean> payment = new HashMap<>();
-    private static final List<UUID> rpayment = new ArrayList<>();
+    // 被异步同步线程(SyncPermission)与主线程命令并发访问，使用并发容器避免数据丢失与 CME
+    private static final Map<UUID, Boolean> payment = new ConcurrentHashMap<>();
+    private static final List<UUID> rpayment = new CopyOnWriteArrayList<>();
 
     public static boolean getGlobalPayment() {
         return globalpayment;
