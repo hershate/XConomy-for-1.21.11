@@ -35,9 +35,9 @@ public class Baltop implements Runnable {
         Cache.baltop.clear();
         SQL.getBaltop();
         DataCon.sumbal();
-        if (AdapterManager.PLUGIN.getOnlinePlayersisEmpty()) {
-            Cache.clearCache();
-        }else{
+        // 不再在"无在线玩家"时 clearCache()：异步落库可能尚未完成，
+        // 此时清缓存会导致下次读取拿到旧值而丢失余额。缓存按玩家退出个体清理。
+        if (!AdapterManager.PLUGIN.getOnlinePlayersisEmpty()) {
             if (XConomyLoad.DConfig.isMySQL() && XConomyLoad.Config.PAY_TIPS) {
                 for (UUID uu : AdapterManager.PLUGIN.getOnlinePlayersUUIDs()) {
                     DataLink.updatelogininfo(uu);

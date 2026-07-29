@@ -270,11 +270,18 @@ public class SQL {
         }
     }
 
-    public static void save(PlayerData pd, Boolean isAdd, BigDecimal amount, RecordInfo ri) {
+    public static boolean save(PlayerData pd, Boolean isAdd, BigDecimal amount, RecordInfo ri) {
         Connection connection = database.getConnectionAndCheck();
+        if (connection == null) {
+            XConomy.getInstance().logger("余额保存失败：无法获取数据库连接", 1, null);
+            return false;
+        }
+        boolean success = false;
         try {
+            // 始终使用相对增量更新（balance +/- amount），由数据库保证原子累加，
+            // 避免缓存丢失更新（lost update）被绝对值覆盖写入而导致的丢币/刷币。
+            // 仅 set 操作（isAdd == null）使用绝对值覆盖。
             String query = " set balance = ? where UID = ?";
-//            if (XConomyLoad.Config.DISABLE_CACHE) {
             if (isAdd != null) {
                 if (isAdd) {
                     query = " set balance = balance + ? where UID = ?";
@@ -282,21 +289,19 @@ public class SQL {
                     query = " set balance = balance - ? where UID = ?";
                 }
             }
-//            }
             PreparedStatement statement = connection.prepareStatement("update " + tableName + query);
-//            if (!XConomyLoad.Config.DISABLE_CACHE) {
-//                statement.setDouble(1, pd.getBalance().doubleValue());
-//            } else {
             statement.setDouble(1, amount.doubleValue());
-//            }
             statement.setString(2, pd.getUniqueId().toString());
             statement.executeUpdate();
             statement.close();
+            success = true;
         } catch (SQLException e) {
+            XConomy.getInstance().logger("余额保存异常", 1, null);
             e.printStackTrace();
         }
         record(connection, pd, isAdd, amount, pd.getBalance(), ri);
         database.closeHikariConnection(connection);
+        return success;
     }
 
     //public static void save(String type, PlayerData pd, Boolean isAdd,
@@ -339,9 +344,14 @@ public class SQL {
     //    database.closeHikariConnection(connection);
     //}
 
-    public static void saveall(String targettype, List<UUID> players, BigDecimal amount, Boolean isAdd,
+    public static boolean saveall(String targettype, List<UUID> players, BigDecimal amount, Boolean isAdd,
                                RecordInfo ri) {
         Connection connection = database.getConnectionAndCheck();
+        if (connection == null) {
+            XConomy.getInstance().logger("批量余额保存失败：无法获取数据库连接", 1, null);
+            return false;
+        }
+        boolean success = false;
         try {
             if (targettype.equalsIgnoreCase("all")) {
                 String query;
@@ -353,65 +363,83 @@ public class SQL {
                 PreparedStatement statement = connection.prepareStatement("update " + tableName + query);
                 statement.executeUpdate();
                 statement.close();
+                success = true;
             } else if (targettype.equalsIgnoreCase("online")) {
-                StringBuilder query;
-                if (isAdd) {
-                    query = new StringBuilder(" set balance = balance + " + amount + " where");
+                if (players == null || players.isEmpty()) {
+                    success = true;
                 } else {
-                    query = new StringBuilder(" set balance = balance - " + amount + " where");
-                }
-                int jsm = players.size();
-                int js = 1;
-
-                for (UUID u : players) {
-                    if (js == jsm) {
-                        query.append(" UID = '").append(u.toString()).append("'");
+                    StringBuilder query;
+                    if (isAdd) {
+                        query = new StringBuilder(" set balance = balance + " + amount + " where");
                     } else {
-                        query.append(" UID = '").append(u.toString()).append("' OR");
-                        js = js + 1;
+                        query = new StringBuilder(" set balance = balance - " + amount + " where");
                     }
+                    int jsm = players.size();
+                    int js = 1;
+
+                    for (UUID u : players) {
+                        if (js == jsm) {
+                            query.append(" UID = '").append(u.toString()).append("'");
+                        } else {
+                            query.append(" UID = '").append(u.toString()).append("' OR");
+                            js = js + 1;
+                        }
+                    }
+                    PreparedStatement statement = connection.prepareStatement("update " + tableName + query);
+                    statement.executeUpdate();
+                    statement.close();
+                    success = true;
                 }
-                PreparedStatement statement = connection.prepareStatement("update " + tableName + query);
-                statement.executeUpdate();
-                statement.close();
             }
         } catch (SQLException e) {
+            XConomy.getInstance().logger("批量余额保存异常", 1, null);
             e.printStackTrace();
         }
         if (ri != null) {
             record(connection, null, isAdd, amount, BigDecimal.ZERO, ri);
         }
         database.closeHikariConnection(connection);
+        return success;
     }
 
-    public static void saveNonPlayer(String account, BigDecimal amount,
+    public static boolean saveNonPlayer(String account, BigDecimal amount,
                                      BigDecimal newbalance, Boolean isAdd, RecordInfo ri) {
         Connection connection = database.getConnectionAndCheck();
+        if (connection == null) {
+            XConomy.getInstance().logger("非玩家账户保存失败：无法获取数据库连接", 1, null);
+            return false;
+        }
+        boolean success = false;
         try {
-            String query = " set balance = ? where account = ?";
-            if (XConomyLoad.Config.DISABLE_CACHE) {
-                if (isAdd != null) {
-                    if (isAdd) {
-                        query = " set balance = balance + ? where account = ?";
-                    } else {
-                        query = " set balance = balance - ? where account = ?";
-                    }
+            // 与玩家账户一致：增减操作一律使用数据库原子增量，避免缓存丢失更新被绝对值覆盖。
+            // 仅 set 操作（isAdd == null）使用绝对值覆盖。
+            String query;
+            if (isAdd != null) {
+                if (isAdd) {
+                    query = " set balance = balance + ? where account = ?";
+                } else {
+                    query = " set balance = balance - ? where account = ?";
                 }
+            } else {
+                query = " set balance = ? where account = ?";
             }
             PreparedStatement statement = connection.prepareStatement("update " + tableNonPlayerName + query);
-            if (!XConomyLoad.Config.DISABLE_CACHE) {
-                statement.setDouble(1, newbalance.doubleValue());
-            } else {
+            if (isAdd != null) {
                 statement.setDouble(1, amount.doubleValue());
+            } else {
+                statement.setDouble(1, newbalance.doubleValue());
             }
             statement.setString(2, account);
             statement.executeUpdate();
             statement.close();
+            success = true;
         } catch (SQLException e) {
+            XConomy.getInstance().logger("非玩家账户保存异常", 1, null);
             e.printStackTrace();
         }
         record(connection, new PlayerData(null, account, null), isAdd, amount, newbalance, ri);
         database.closeHikariConnection(connection);
+        return success;
     }
 
 

@@ -62,9 +62,10 @@ public class PlayerConnection{
     }
     public static void onQuit(CPlayer player) {
 
-        if (AdapterManager.PLUGIN.getOnlinePlayerSize() == 1) {
-            Cache.clearCache();
-        }
+        // 仅清除该退出玩家自身的缓存，不再清空全部缓存。
+        // 原先在"最后一名玩家退出"时 clearCache() 全部清空，会与尚未完成的异步落库产生竞态，
+        // 导致下次读取从数据库拿到旧值而丢失余额变更。
+        Cache.removefromCache(player.getUniqueId());
 
         TabListCon.remove_Tab_PlayerList(player.getName());
 

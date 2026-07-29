@@ -37,8 +37,23 @@ import me.yic.xconomy.utils.SendPluginMessage;
 
 import java.math.BigDecimal;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class DataCon {
+
+    // 按账户维度的锁，串行化同一玩家/非玩家账户的"读取-计算-写缓存"流程，
+    // 消除高并发下的缓存丢失更新（lost update）。
+    private static final ConcurrentHashMap<UUID, ReentrantLock> playerLocks = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<String, ReentrantLock> accountLocks = new ConcurrentHashMap<>();
+
+    private static ReentrantLock getPlayerLock(UUID u) {
+        return playerLocks.computeIfAbsent(u, k -> new ReentrantLock());
+    }
+
+    private static ReentrantLock getAccountLock(String a) {
+        return accountLocks.computeIfAbsent(a, k -> new ReentrantLock());
+    }
 
     public static PlayerData getPlayerData(UUID uuid) {
         return getPlayerDatai(uuid);
@@ -75,9 +90,9 @@ public class DataCon {
         if (pd == null){
             pd = DataLink.getPlayerData(u);
         }
-        if (AdapterManager.PLUGIN.getOnlinePlayersisEmpty()) {
-            Cache.clearCache();
-        }
+        // 不再在"无在线玩家"时清空全部缓存：异步落库可能尚未完成，
+        // 此时清缓存会导致下次读取从数据库拿到旧值，造成余额丢失。
+        // 缓存清理改由玩家退出（onQuit）按个体进行。
         return pd;
     }
 
@@ -129,81 +144,118 @@ public class DataCon {
 
     public static BigDecimal changeplayerdata(final String type, final UUID uid, final BigDecimal amount, final Boolean isAdd, final String command, final Object comment) {
         PlayerData pd = getPlayerData(uid);
-        UUID u = pd.getUniqueId();
-        BigDecimal newvalue = amount;
-        BigDecimal bal = pd.getBalance();
+        if (pd == null) {
+            XConomy.getInstance().logger("余额变更失败：未找到玩家数据 - " + uid, 1, null);
+            return BigDecimal.ZERO;
+        }
+        final UUID u = pd.getUniqueId();
+        final BigDecimal bal;
+        final BigDecimal newvalue;
 
-        RecordInfo ri = new RecordInfo(type, command, comment);
+        // 串行化同一玩家的"读取-计算-写缓存"，避免并发丢失更新（lost update）。
+        synchronized (getPlayerLock(u)) {
+            pd = getPlayerData(uid);
+            if (pd == null) {
+                XConomy.getInstance().logger("余额变更失败：未找到玩家数据 - " + uid, 1, null);
+                return BigDecimal.ZERO;
+            }
+            bal = pd.getBalance();
+            if (isAdd != null) {
+                if (isAdd) {
+                    newvalue = bal.add(amount);
+                } else {
+                    newvalue = bal.subtract(amount);
+                }
+            } else {
+                newvalue = amount;
+            }
+            Cache.updateIntoCache(u, pd, newvalue, bal);
+        }
+
+        final PlayerData fpd = pd;
+        final RecordInfo ri = new RecordInfo(type, command, comment);
 
         CallAPI.CallPlayerAccountEvent(u, pd.getName(), bal, amount, isAdd, ri);
 
-        if (isAdd != null) {
-            if (isAdd) {
-                newvalue = bal.add(amount);
+        Runnable saveTask = () -> {
+            if (DataLink.save(fpd, isAdd, amount, ri)) {
+                if (XConomyLoad.getSyncData_Enable()) {
+                    SendMessTask(fpd);
+                }
             } else {
-                newvalue = bal.subtract(amount);
+                // 落库失败：失效该玩家缓存，下次读取将从数据库获取真实余额，
+                // 避免缓存长期保留未被持久化的错误数值（防丢币/刷币）。
+                Cache.deleteDataFromCache(u);
+                XConomy.getInstance().logger("严重：玩家余额落库失败，已失效缓存以便从数据库恢复 - " + u, 1, null);
             }
-        }
-
-        Cache.updateIntoCache(u, pd, newvalue, bal);
+        };
 
         if (XConomyLoad.DConfig.canasync && AdapterManager.checkisMainThread()) {
-            AdapterManager.runTaskAsynchronously(() -> {
-                DataLink.save(pd, isAdd, amount, ri);
-                if (XConomyLoad.getSyncData_Enable()) {
-                    SendMessTask(pd);
-                }
-            });
+            AdapterManager.runTaskAsynchronously(saveTask);
         } else {
-            DataLink.save(pd, isAdd, amount, ri);
-            if (XConomyLoad.getSyncData_Enable()) {
-                SendMessTask(pd);
-            }
+            saveTask.run();
         }
 
         return newvalue;
     }
 
 
-    @SuppressWarnings("ConstantConditions")
     public static void changeaccountdata(final String type, final String u, final BigDecimal amount, final Boolean isAdd, final String command) {
-        BigDecimal newvalue = amount;
-        BigDecimal balance = getAccountBalance(u);
-
-        RecordInfo ri = new RecordInfo(type, command, null);
-
-        CallAPI.CallNonPlayerAccountEvent(u, balance, amount, isAdd, type);
-        if (isAdd != null) {
-            if (isAdd) {
-                newvalue = balance.add(amount);
-            } else {
-                newvalue = balance.subtract(amount);
+        synchronized (getAccountLock(u)) {
+            BigDecimal balance = getAccountBalance(u);
+            if (balance == null) {
+                XConomy.getInstance().logger("非玩家账户余额变更：账户不存在，按 0 处理 - " + u, 1, null);
+                balance = BigDecimal.ZERO;
             }
-        }
-        CacheNonPlayer.insertIntoCache(u, newvalue);
+            BigDecimal newvalue;
 
-        if (XConomyLoad.DConfig.canasync && AdapterManager.checkisMainThread()) {
+            RecordInfo ri = new RecordInfo(type, command, null);
+
+            CallAPI.CallNonPlayerAccountEvent(u, balance, amount, isAdd, type);
+            if (isAdd != null) {
+                if (isAdd) {
+                    newvalue = balance.add(amount);
+                } else {
+                    newvalue = balance.subtract(amount);
+                }
+            } else {
+                newvalue = amount;
+            }
+            CacheNonPlayer.insertIntoCache(u, newvalue);
+
             final BigDecimal fnewvalue = newvalue;
-            AdapterManager.runTaskAsynchronously(() -> DataLink.saveNonPlayer(u, amount, fnewvalue, isAdd, ri));
-        } else {
-            DataLink.saveNonPlayer(u, amount, newvalue, isAdd, ri);
+            Runnable saveTask = () -> {
+                if (!DataLink.saveNonPlayer(u, amount, fnewvalue, isAdd, ri)) {
+                    CacheNonPlayer.bal.remove(u);
+                    XConomy.getInstance().logger("严重：非玩家账户落库失败，已失效缓存以便从数据库恢复 - " + u, 1, null);
+                }
+            };
+
+            if (XConomyLoad.DConfig.canasync && AdapterManager.checkisMainThread()) {
+                AdapterManager.runTaskAsynchronously(saveTask);
+            } else {
+                saveTask.run();
+            }
         }
     }
 
     public static void changeallplayerdata(String targettype, String type, BigDecimal amount, Boolean isAdd, String command, StringBuilder comment) {
-        Cache.clearCache();
-
         RecordInfo ri = new RecordInfo(type, command, comment);
 
-        if (XConomyLoad.DConfig.canasync && AdapterManager.checkisMainThread()) {
-            AdapterManager.runTaskAsynchronously(() -> DataLink.saveall(targettype, amount, isAdd, ri));
-        } else {
+        Runnable saveTask = () -> {
             DataLink.saveall(targettype, amount, isAdd, ri);
+            // 批量更新写入数据库后再清空缓存，确保下次读取拿到的是更新后的真实余额，
+            // 避免在"缓存已清但数据库未改"的窗口内读到旧值。
+            Cache.clearCache();
+        };
+
+        if (XConomyLoad.DConfig.canasync && AdapterManager.checkisMainThread()) {
+            AdapterManager.runTaskAsynchronously(saveTask);
+        } else {
+            saveTask.run();
         }
 
         boolean isallbool = targettype.equals("all");
-        //if (targettype.equals("all")) {
-        //} else
 
         if (XConomyLoad.getSyncData_Enable()) {
             SendMessTask(new SyncBalanceAll(isallbool, isAdd, amount));

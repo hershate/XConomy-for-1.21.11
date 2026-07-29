@@ -136,8 +136,8 @@ public class DataLink{
         return SQL.sumBal();
     }
 
-    public static void save(PlayerData pd, Boolean isAdd, BigDecimal amount, RecordInfo ri) {
-        SQL.save(pd, isAdd, amount, ri);
+    public static boolean save(PlayerData pd, Boolean isAdd, BigDecimal amount, RecordInfo ri) {
+        return SQL.save(pd, isAdd, amount, ri);
     }
 
     public static void newPlayer(CPlayer a) {
@@ -180,8 +180,8 @@ public class DataLink{
         });
     }
 
-    public static void saveNonPlayer(String account, BigDecimal amount,
+    public static boolean saveNonPlayer(String account, BigDecimal amount,
                                BigDecimal newbalance, Boolean isAdd, RecordInfo ri){
-        SQL.saveNonPlayer(account, amount, newbalance, isAdd, ri);
+        return SQL.saveNonPlayer(account, amount, newbalance, isAdd, ri);
     }
 }
