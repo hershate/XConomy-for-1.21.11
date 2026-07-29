@@ -199,6 +199,67 @@ public class DataCon {
         return newvalue;
     }
 
+    /**
+     * 带余额充足性原子校验的玩家余额变更，专用于玩家转账(/pay)等"扣款前必须确认余额"的场景。
+     * 在 per-UUID 锁内读取最新余额并校验，余额不足时不做任何变更并返回 false，
+     * 消除"调用方检查余额"与"实际扣款"之间的 TOCTOU 竞态（高并发下被异步来源扣款导致透支）。
+     * 仅扣款（isAdd == false）校验下限；存款/set 不校验。
+     *
+     * @return true 表示变更已提交（缓存已更新，落库已派发）；false 表示账户不存在或余额不足。
+     */
+    public static boolean changeplayerdataWithCheck(final String type, final UUID uid, final BigDecimal amount, final Boolean isAdd, final String command, final Object comment) {
+        PlayerData pd = getPlayerData(uid);
+        if (pd == null) {
+            XConomy.getInstance().logger("余额变更失败：未找到玩家数据 - " + uid, 1, null);
+            return false;
+        }
+        final UUID u = pd.getUniqueId();
+
+        synchronized (getPlayerLock(u)) {
+            pd = getPlayerData(uid);
+            if (pd == null) {
+                XConomy.getInstance().logger("余额变更失败：未找到玩家数据 - " + uid, 1, null);
+                return false;
+            }
+            BigDecimal bal = pd.getBalance();
+            if (isAdd != null && !isAdd && bal.compareTo(amount) < 0) {
+                return false;
+            }
+            BigDecimal newvalue;
+            if (isAdd != null) {
+                if (isAdd) {
+                    newvalue = bal.add(amount);
+                } else {
+                    newvalue = bal.subtract(amount);
+                }
+            } else {
+                newvalue = amount;
+            }
+            Cache.updateIntoCache(u, pd, newvalue, bal);
+        }
+
+        final PlayerData fpd = pd;
+        final RecordInfo ri = new RecordInfo(type, command, comment);
+
+        Runnable saveTask = () -> {
+            if (DataLink.save(fpd, isAdd, amount, ri)) {
+                if (XConomyLoad.getSyncData_Enable()) {
+                    SendMessTask(fpd);
+                }
+            } else {
+                Cache.deleteDataFromCache(u);
+                XConomy.getInstance().logger("严重：玩家余额落库失败，已失效缓存以便从数据库恢复 - " + u, 1, null);
+            }
+        };
+
+        if (XConomyLoad.DConfig.canasync && AdapterManager.checkisMainThread()) {
+            AdapterManager.runTaskAsynchronously(saveTask);
+        } else {
+            saveTask.run();
+        }
+        return true;
+    }
+
 
     public static void changeaccountdata(final String type, final String u, final BigDecimal amount, final Boolean isAdd, final String command) {
         synchronized (getAccountLock(u)) {

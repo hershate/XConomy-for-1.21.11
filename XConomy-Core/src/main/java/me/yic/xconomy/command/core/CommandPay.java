@@ -129,12 +129,22 @@ public class CommandPay extends CommandCore{
         }
 
         String com = commandName + " " + args[0] + " " + amount;
-        DataCon.changeplayerdata("PLAYER_COMMAND", sender.toPlayer().getUniqueId(), taxamount, false, com, null);
+        // 发送方扣款采用带原子余额校验的方法：余额不足则终止转账（不扣发送方、不加接收方），
+        // 消除"检查余额"与"扣款"之间的 TOCTOU 透支风险（高并发下被异步来源扣款导致）。
+        boolean ok = DataCon.changeplayerdataWithCheck("PLAYER_COMMAND", sender.toPlayer().getUniqueId(), taxamount, false, com, null);
+        if (!ok) {
+            sendMessages(sender, PREFIX + translateColorCodes("pay_fail")
+                    .replace("%amount%", taxamountFormatted));
+            return true;
+        }
+        // 发送方已扣款；随即加接收方，两次余额变更连续完成后再发送提示消息，
+        // 避免消息构造/发送异常导致"已扣款未入账"的资金丢失。
+        DataCon.changeplayerdata("PLAYER_COMMAND", targetUUID, amount, true, com, null);
+
         sendMessages(sender, PREFIX + translateColorCodes("pay")
                 .replace("%player%", realname)
                 .replace("%amount%", amountFormatted));
 
-        DataCon.changeplayerdata("PLAYER_COMMAND", targetUUID, amount, true, com, null);
         String mess = PREFIX + translateColorCodes("pay_receive")
                 .replace("%player%", sender.getName())
                 .replace("%amount%", amountFormatted);
