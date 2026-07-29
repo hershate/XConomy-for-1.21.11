@@ -11,6 +11,7 @@
         <module>XConomy-Bukkit</module>
         <module>XConomy-Paper</module>
         <module>XConomy-Core</module>
+        <module>benchmark</module>
     </modules>
     <packaging>pom</packaging>
 

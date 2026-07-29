@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <parent>
+        <artifactId>XConomy</artifactId>
+        <groupId>me.yic</groupId>
+        <version>${revision}</version>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+
+    <artifactId>benchmark</artifactId>
+
+    <!--
+        性能基准模块（非生产代码，不打包进 Bukkit/Paper jar）。
+        通过反射注入最小可运行的 XConomy 运行时环境（Config / 真实 CChat / Map 版 CConfig），
+        在同一 JVM、相同输入与相同预热条件下，对比“原始算法(Baseline*)”与“优化后 Core 实现”的吞吐与延迟。
+    -->
+
+    <properties>
+        <maven.compiler.source>8</maven.compiler.source>
+        <maven.compiler.target>8</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <exec.mainClass>me.yic.xconomy.bench.BenchRunner</exec.mainClass>
+    </properties>
+
+    <dependencies>
+        <!--被测核心-->
+        <dependency>
+            <groupId>me.yic</groupId>
+            <artifactId>XConomy-Core</artifactId>
+            <version>${revision}</version>
+            <scope>compile</scope>
+        </dependency>
+        <!--提供 net.md_5.bungee.api.ChatColor 桩（真实颜色翻译算法），供 PEshownf / CChat 委托-->
+        <dependency>
+            <groupId>me.yic</groupId>
+            <artifactId>XConomy-Stub</artifactId>
+            <version>${revision}</version>
+            <scope>compile</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <defaultGoal>process-classes</defaultGoal>
+        <plugins>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.1.0</version>
+                <configuration>
+                    <mainClass>${exec.mainClass}</mainClass>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>
