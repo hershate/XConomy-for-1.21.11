@@ -27,9 +27,8 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class DataFormat {
 
@@ -46,20 +45,27 @@ public class DataFormat {
     // shown/PEshownf 的输出仅取决于“余额值”与“load() 之后固定的格式化配置”
     // （displayformat / singular|pluralname / decimalFormat / format-balance / roundingmode）。
     // 在高重复访问场景（PlaceholderAPI、记分板、Tab 列表对同一玩家余额反复刷新）下，
-    // 用按余额值的有界 LRU 缓存，把一次完整的格式化（BigDecimal 比较 + 多次 String.replace
-    // + DecimalFormat + 颜色翻译）折叠为一次哈希查询。配置重载（load()）时清空。
+    // 用按余额值的缓存把一次完整格式化（BigDecimal 比较 + 多次 String.replace + DecimalFormat
+    // + 颜色翻译）折叠为一次哈希查询。
+    //
+    // 采用 ConcurrentHashMap（读 get() 无锁）而非 synchronizedMap：PlaceholderAPI/记分板是多线程
+    // 并发读取，synchronizedMap 的全局锁会把并发读串行化（实测 8 线程聚合吞吐被严重压制）。
+    // 用 AtomicInteger 计数做软容量上限（真实负载去重余额数远小于容量，几乎不触发），
+    // 超限时不再写入新项（已缓存项仍可命中），避免无界增长。load() 重载时清空。
     // BigDecimal 不可变且 equals/hashCode 按值，作为缓存键安全。
     private static final int SHOWN_CACHE_CAPACITY = 4096;
-    private static final Map<BigDecimal, String> shownCache = boundedLruCache();
-    private static final Map<BigDecimal, String> peShownCache = boundedLruCache();
+    private static final ConcurrentHashMap<BigDecimal, String> shownCache = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<BigDecimal, String> peShownCache = new ConcurrentHashMap<>();
+    private static final AtomicInteger shownCacheSize = new AtomicInteger();
+    private static final AtomicInteger peShownCacheSize = new AtomicInteger();
 
-    private static Map<BigDecimal, String> boundedLruCache() {
-        return Collections.synchronizedMap(new LinkedHashMap<BigDecimal, String>(256, 0.75f, true) {
-            @Override
-            protected boolean removeEldestEntry(Map.Entry<BigDecimal, String> eldest) {
-                return size() > SHOWN_CACHE_CAPACITY;
+    private static void putBounded(ConcurrentHashMap<BigDecimal, String> map, AtomicInteger size,
+                                   BigDecimal key, String value) {
+        if (size.get() < SHOWN_CACHE_CAPACITY) {
+            if (map.putIfAbsent(key, value) == null) {
+                size.incrementAndGet();
             }
-        });
+        }
     }
 
 
@@ -97,7 +103,7 @@ public class DataFormat {
             return cached;
         }
         String result = computeShown(am);
-        shownCache.put(am, result);
+        putBounded(shownCache, shownCacheSize, am, result);
         return result;
     }
 
@@ -125,7 +131,7 @@ public class DataFormat {
             return cached;
         }
         String result = computePEshownf(am);
-        peShownCache.put(am, result);
+        putBounded(peShownCache, peShownCacheSize, am, result);
         return result;
     }
 
@@ -147,9 +153,11 @@ public class DataFormat {
     }
 
     public static void load() {
-        // 配置重载：展示结果可能改变，清空展示缓存。
+        // 配置重载：展示结果可能改变，清空展示缓存并重置容量计数。
         shownCache.clear();
         peShownCache.clear();
+        shownCacheSize.set(0);
+        peShownCacheSize.set(0);
         maxNumber = setmaxnumber();
         isint = XConomyLoad.Config.INTEGER_BAL;
         String gpoint = XConomyLoad.Config.THOUSANDS_SEPARATOR;
