@@ -46,11 +46,16 @@ public class ProcessSyncData {
                 return;
             }
 
-            SyncData ob = (SyncData) ios.readObject();
-
-            if (!ob.getSign().equals(XConomyLoad.Config.SYNCDATA_SIGN)) {
+            // 签名校验必须在反序列化对象之前完成。客户端可通过自定义 payload 伪造
+            // plugin message 直接发到本通道（冒充代理转发），签名是防止伪造数据篡改
+            // 任意玩家余额（刷币）的关键防线；同时避免恶意 byte[] 触发 Java 反序列化。
+            String sg = ios.readUTF();
+            String configSign = XConomyLoad.Config.SYNCDATA_SIGN;
+            if (configSign == null || configSign.isEmpty() || !configSign.equals(sg)) {
                 return;
             }
+
+            SyncData ob = (SyncData) ios.readObject();
 
             if (XConomyLoad.Config.SYNCDATA_TYPE.equals(SyncChannalType.REDIS) && ob.getServerKey().equals(SyncInfo.server_key)) {
                 return;

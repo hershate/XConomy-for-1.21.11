@@ -63,7 +63,10 @@ public abstract class SyncData implements Serializable {
         ByteArrayOutputStream output = new ByteArrayOutputStream();
         try {
             ObjectOutputStream oos = new ObjectOutputStream(output);
+            // 先写入版本号与签名，接收方据此在反序列化对象之前完成校验，
+            // 避免恶意构造的 byte[] 触发 Java 原生反序列化（伪造来源刷币 / 反序列化攻击）。
             oos.writeUTF(XConomy.syncversion);
+            oos.writeUTF(this.sign == null ? "" : this.sign);
             oos.writeObject(this);
             oos.flush();
         } catch (IOException e) {

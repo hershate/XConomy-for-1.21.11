@@ -57,6 +57,8 @@ public class Vsync {
 
             String sv = ios.readUTF();
             oos.writeUTF(sv);
+            String syncSign = ios.readUTF();
+            oos.writeUTF(syncSign);
             String svv = sv;
             if (svv.contains(".")) {
                 svv = "versions §f" + svv;

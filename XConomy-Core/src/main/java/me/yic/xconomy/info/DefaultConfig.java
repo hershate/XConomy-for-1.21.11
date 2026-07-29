@@ -154,6 +154,16 @@ public class DefaultConfig {
             }else if (channeltype.equalsIgnoreCase("Redis")) {
                 SYNCDATA_TYPE = SyncChannalType.REDIS;
             }
+
+            // 安全校验：签名是防止客户端伪造同步数据篡改余额的关键防线，弱签名时发出严重警告。
+            String sign = SYNCDATA_SIGN;
+            if (sign == null || sign.isEmpty() || sign.length() < 12 || sign.equals("aa")) {
+                XConomy.getInstance().logger("==================================================", 1, null);
+                XConomy.getInstance().logger("跨服同步签名(SyncData.sign)过弱或为默认值！", 1, null);
+                XConomy.getInstance().logger("客户端可伪造同步数据篡改任意玩家余额(刷币)。", 1, null);
+                XConomy.getInstance().logger("请在 config.yml 设置不少于 12 位的随机字符串作为 sign。", 1, null);
+                XConomy.getInstance().logger("==================================================", 1, null);
+            }
         }
     }
 

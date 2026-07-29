@@ -108,6 +108,9 @@ SyncData:
   #Require 'slf4j' dependencies
   channel-type: BungeeCord
   #Server ID, keep the ID and the MySQL settings is the same between the servers requiring synchronization
+  #SECURITY: sign 用于校验跨服同步数据。恶意客户端可伪造 plugin message 直发本通道，
+  #若签名过弱或为默认值，攻击者即可伪造同步数据篡改任意玩家余额（刷币）。
+  #请将 sign 改为一个不少于 12 位的随机字符串，切勿使用默认值；所有需同步的服务器必须使用相同 sign。
   sign: aa
 
 
